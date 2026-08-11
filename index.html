@@ -354,6 +354,7 @@
 
   const COARSE_COL = COARSE_HEX.map(h => new THREE.Color(h));
   const GRAY = new THREE.Color(0x898781);
+  const tmpSide = new THREE.Color();
   function refreshColors() {
     for (let i = 0; i < N; i++) {
       if (mode === 'scan' || colorMode === 'ink') {
@@ -363,7 +364,9 @@
       } else {
         const g = coarseOf[perm[i]];
         const c = g < 0 ? GRAY : COARSE_COL[g];
-        bars.setColorAt(i, c);
+        // sides are lambert-lit up to ~1.3x — pre-darken so the lit faces land on the
+        // cap's exact hex instead of washing out
+        bars.setColorAt(i, tmpSide.copy(c).multiplyScalar(0.78));
         caps.setColorAt(i, c);
       }
     }
