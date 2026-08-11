@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>扫一扫 · A Dear Data postcard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600&text=%E6%89%AB%E4%B8%80&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #141311;
+    --ink-2: #4c4944;
+    --ink-3: #8a867f;
+    --hairline: rgba(20, 19, 17, 0.12);
+    --vermilion: #c03a2b;
+    --cat-pay: #2a78d6;
+    --cat-move: #eb6834;
+    --cat-food: #1baf7a;
+    --cat-other: #898781;
+    --serif: "Newsreader", "Songti SC", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: #fff; color: var(--ink); font-family: var(--sans); }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .hud { position: fixed; z-index: 2; pointer-events: none; -webkit-user-select: none; user-select: none; }
+  .hud a, .hud button { pointer-events: auto; }
+
+  /* ---------- header ---------- */
+  header { top: clamp(20px, 4.5vh, 44px); left: clamp(20px, 4vw, 52px); max-width: 400px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: 14px; font-weight: 500;
+  }
+  h1 {
+    font-family: "Noto Serif SC", var(--serif);
+    font-size: clamp(52px, 7vw, 76px); font-weight: 600; line-height: 1;
+    letter-spacing: 0.01em;
+  }
+  .pinyin {
+    font-family: var(--serif); font-style: italic; font-size: 17px;
+    color: var(--ink-2); margin-top: 10px;
+  }
+  .dek {
+    font-family: var(--serif); font-size: 16.5px; line-height: 1.55;
+    color: var(--ink-2); margin-top: 18px; max-width: 380px;
+  }
+  .dek strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- stats ---------- */
+  .stats { display: flex; gap: 30px; margin-top: 26px; flex-wrap: wrap; }
+  .stat .v {
+    font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .stat .v small { font-size: 13px; font-weight: 450; color: var(--ink-2); letter-spacing: 0; }
+  .stat .l {
+    font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3); margin-top: 3px; font-weight: 500;
+  }
+
+  /* ---------- controls ---------- */
+  .controls {
+    bottom: clamp(20px, 4.5vh, 44px); right: clamp(20px, 4vw, 52px);
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px;
+    max-width: 92vw;
+  }
+  .seg {
+    display: inline-flex; border: 1px solid var(--hairline); border-radius: 99px;
+    overflow: hidden; background: rgba(255,255,255,.85); backdrop-filter: blur(6px);
+  }
+  .seg button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: 500 11px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-3); padding: 11px 16px; transition: color .15s, background .15s;
+  }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .hint { font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em; flex-basis: 100%; text-align: right; margin-top: 2px; }
+
+  /* ---------- legend ---------- */
+  .legend {
+    bottom: 108px; right: clamp(20px, 4vw, 52px); text-align: right;
+    opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s;
+  }
+  .legend.show { opacity: 1; transform: none; }
+  .legend .row {
+    display: flex; justify-content: flex-end; align-items: center; gap: 8px;
+    padding: 4px 0; pointer-events: auto; cursor: default;
+  }
+  .legend .row span { font-size: 12px; color: var(--ink-2); transition: color .15s; }
+  .legend .row:hover span { color: var(--ink); font-weight: 600; }
+  .legend .sw { width: 9px; height: 9px; border-radius: 2px; }
+
+  /* ---------- tooltip ---------- */
+  .tip {
+    position: fixed; z-index: 5; pointer-events: none; opacity: 0;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 12px;
+    box-shadow: 0 10px 34px rgba(20,19,17,.10); padding: 13px 15px; width: 218px;
+    transition: opacity .12s;
+  }
+  .tip.show { opacity: 1; }
+  .tip .when { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  .tip .count { font-size: 21px; font-weight: 650; margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
+  .tip .count small { font-size: 12.5px; font-weight: 450; color: var(--ink-2); }
+  .tip .br { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+  .tip .br .bl { font-size: 11.5px; color: var(--ink-2); width: 74px; flex: none; }
+  .tip .br .bar { height: 4px; border-radius: 2px; background: var(--ink); opacity: .78; }
+  .tip .br .bn { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-left: auto; }
+  .colophon {
+    top: clamp(24px, 5vh, 48px); right: clamp(20px, 4vw, 52px); text-align: right;
+    font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em; line-height: 1.6; max-width: 200px;
+  }
+
+  .fade-in { animation: fadeIn .9s ease .25s both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  header, .legend, .colophon { transition: opacity .5s ease; }
+  body.scanning header, body.scanning .legend, body.scanning .colophon {
+    animation: none; opacity: 0; pointer-events: none !important;
+  }
+
+  @media (max-width: 860px) {
+    .colophon { display: none; }
+    header { max-width: 300px; }
+    .dek { font-size: 15px; }
+    .stats { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<header class="hud fade-in">
+  <div class="eyebrow">A Dear Data postcard · Shenzhen</div>
+  <h1>扫一扫</h1>
+  <p class="dek" id="dek"></p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="legend hud" id="legend">
+  <div class="row" data-cat="0"><span>Paying</span><i class="sw" style="background:var(--cat-pay)"></i></div>
+  <div class="row" data-cat="1"><span>Getting around</span><i class="sw" style="background:var(--cat-move)"></i></div>
+  <div class="row" data-cat="2"><span>Food &amp; menus</span><i class="sw" style="background:var(--cat-food)"></i></div>
+  <div class="row" data-cat="3"><span>Everything else</span><i class="sw" style="background:var(--cat-other)"></i></div>
+</div>
+
+<div class="controls hud fade-in">
+  <div class="seg" id="segColor">
+    <button data-c="ink" class="on">Ink</button>
+    <button data-c="cat">By purpose</button>
+  </div>
+  <div class="seg" id="segOrder">
+    <button data-o="time" class="on">Chronology</button>
+    <button data-o="height">By height</button>
+  </div>
+  <div class="seg" id="segView">
+    <button data-v="sculpture" class="on">Sculpture</button>
+    <button data-v="scan">Scan me</button>
+  </div>
+  <div class="hint" id="hint">Drag to orbit &nbsp;·&nbsp; scroll to zoom</div>
+</div>
+
+<div class="colophon hud fade-in" id="colophon"></div>
+
+<div class="tip" id="tip"></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="data.js"></script>
+<script>
+(() => {
+  const D = window.QR_DATA;
+  const SIZE = D.size;
+  const HALF = (SIZE - 1) / 2;
+  const START = new Date(D.startISO).getTime();
+  const HOUR = 3600e3;
+
+  // ---------- derived data ----------
+  const totals = D.hours.map(a => a.reduce((s, v) => s + v, 0));
+  const H_SCALE = 4.6 / D.stats.maxCount;
+  const BASE_H = 0.12;
+
+  // dark modules in reading order -> (col,row) per hour index
+  const cells = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (D.rows[r][c] === '1') cells.push([c, r]);
+
+  const CAT_LABELS = ['Paying', 'Transit', 'Ordering', 'Logins', 'Doors', 'Documents'];
+  const COARSE = [0, 1, 2, 3, 3, 3]; // pay / move / food / other
+  const COARSE_HEX = [0x2a78d6, 0xeb6834, 0x1baf7a, 0x898781];
+
+  const fmtWhen = i => {
+    const d = new Date(START + i * HOUR);
+    const wd = d.toLocaleDateString('en-GB', { weekday: 'short' });
+    const dm = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return `${wd} ${dm} · ${String(d.getHours()).padStart(2, '0')}:00–${String((d.getHours() + 1) % 24).padStart(2, '0')}:00`;
+  };
+
+  // ---------- copy ----------
+  const topShare = Math.round(100 * D.stats.catTotals[0] / D.stats.total);
+  document.getElementById('dek').innerHTML =
+    `For <strong>${D.stats.days} days</strong> I tallied every QR code I scanned — ` +
+    `<strong>${D.stats.total.toLocaleString()}</strong> in all. Each raised block is one hour of the record; ` +
+    `its height is that hour’s count. Seen from above, the record becomes the thing it measures. ` +
+    `Point your camera at it: it’s my WeChat.`;
+
+  const bd = new Date(START + D.stats.busiest.i * HOUR);
+  const stats = [
+    [D.stats.total.toLocaleString(), 'QR codes scanned'],
+    [String(D.stats.days), 'days'],
+    [`${D.stats.busiest.count}<small> · ${bd.toLocaleDateString('en-GB',{weekday:'short'})} ${bd.getHours()}:00</small>`, 'busiest hour'],
+    [`${topShare}%`, 'were payments'],
+  ];
+  document.getElementById('stats').innerHTML = stats
+    .map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+  document.getElementById('colophon').textContent =
+    `Hand-tallied hourly, ${D.stats.rangeLabel} · after Dear Data (Lupi & Posavec)`;
+
+  // ---------- three ----------
+  const canvas = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.setClearColor(0xffffff, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 2500);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d7d2, 1.0));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
+  dir.position.set(-26, 55, 24);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(2048, 2048);
+  dir.shadow.camera.left = dir.shadow.camera.bottom = -32;
+  dir.shadow.camera.right = dir.shadow.camera.top = 32;
+  dir.shadow.camera.near = 10; dir.shadow.camera.far = 130;
+  dir.shadow.radius = 4; dir.shadow.bias = -0.0004;
+  scene.add(dir);
+
+  const shadowMat = new THREE.ShadowMaterial({ opacity: 0.13 });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), shadowMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const N = cells.length;
+  const INK_SIDE = new THREE.Color(0x4a4844);
+  const INK_TOP = new THREE.Color(0x141311);
+  const VERMILION = new THREE.Color(0xc03a2b);
+
+  const barGeo = new THREE.BoxGeometry(1, 1, 1);
+  barGeo.translate(0, 0.5, 0);
+  { // strip top + bottom faces: the cap plane is the only top surface, so it can't z-fight
+    const idx = Array.from(barGeo.index.array);
+    barGeo.setIndex(idx.slice(0, 12).concat(idx.slice(24)));
+    barGeo.clearGroups();
+  }
+  const bars = new THREE.InstancedMesh(barGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), N);
+  bars.castShadow = true;
+  scene.add(bars);
+
+  const capGeo = new THREE.PlaneGeometry(1, 1);
+  capGeo.rotateX(-Math.PI / 2);
+  const caps = new THREE.InstancedMesh(capGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), N);
+  scene.add(caps);
+
+  const heights = cells.map((_, i) => BASE_H + totals[i] * H_SCALE);
+
+  // ---------- state ----------
+  let mode = 'sculpture';          // 'sculpture' | 'scan'
+  let colorMode = 'ink';           // 'ink' | 'cat'
+  let orderMode = 'time';          // 'time' | 'height'
+  let hoverI = -1, catLift = -1;
+  let autoRotate = true;
+  const lift = new Float32Array(N);
+
+  // dominant coarse purpose per hour (-1 for empty hours)
+  const coarseOf = D.hours.map((a, i) => {
+    if (!totals[i]) return -1;
+    const g = [0, 0, 0, 0];
+    a.forEach((v, c) => g[COARSE[c]] += v);
+    let best = 0;
+    for (let k = 1; k < 4; k++) if (g[k] > g[best]) best = k;
+    return best;
+  });
+
+  // perm[cell] = hour displayed at that dark module
+  const perm = new Uint16Array(N);
+  for (let i = 0; i < N; i++) perm[i] = i;
+  const dispH = Float32Array.from(heights);
+
+  function setOrder(o) {
+    orderMode = o;
+    document.querySelectorAll('#segOrder button').forEach(b => b.classList.toggle('on', b.dataset.o === o));
+    if (o === 'time') {
+      for (let i = 0; i < N; i++) perm[i] = i;
+    } else {
+      const sorted = Array.from({ length: N }, (_, i) => i)
+        .sort((a, b) => totals[b] - totals[a] || a - b);
+      for (let i = 0; i < N; i++) perm[i] = sorted[i];
+    }
+    refreshColors();
+    hideTip();
+  }
+
+  const cam = { theta: -0.65, phi: 0.96, radius: 95, fov: 30, fp: 0.94, shadow: 0.13, shift: 0, shiftY: 0, ty: 1.4 };
+  const SCULPT = { phi: 0.96, radius: 95, fov: 30, fp: 0.94, shadow: 0.13, shift: 0, shiftY: 0, ty: 1.4 };
+  const SCAN = { phi: 0.008, theta: 0, fov: 2.4, fp: 1.03, shadow: 0, shift: 0, shiftY: 0, ty: 0 };
+  let tween = null;
+
+  const scanRadius = () => {
+    const E = HALF + 1 + 4.5; // grid half + module + quiet zone
+    const aspect = canvas.clientWidth / canvas.clientHeight;
+    return E / (Math.tan(THREE.MathUtils.degToRad(SCAN.fov / 2)) * Math.min(1, aspect));
+  };
+
+  function setMode(m) {
+    if (m === mode) return;
+    mode = m;
+    document.querySelectorAll('#segView button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+    document.getElementById('hint').textContent =
+      m === 'scan' ? 'Point a phone camera at the screen — it reads' : 'Drag to orbit  ·  scroll to zoom';
+    const from = { ...cam };
+    const to = m === 'scan'
+      ? { ...SCAN, radius: scanRadius(), theta: nearestTurn(cam.theta, SCAN.theta) }
+      : { ...SCULPT, shift: SCULPT.shift, theta: nearestTurn(cam.theta, -0.65) };
+    tween = { from, to, t0: performance.now(), dur: 1150 };
+    document.body.classList.toggle('scanning', m === 'scan');
+    refreshColors();
+    hideTip();
+  }
+  // approach 0 via the shortest angular path
+  const nearestTurn = (a, b) => {
+    const twoPi = Math.PI * 2;
+    let d = (b - a) % twoPi;
+    if (d > Math.PI) d -= twoPi;
+    if (d < -Math.PI) d += twoPi;
+    return a + d;
+  };
+
+  function setColorMode(c) {
+    colorMode = c;
+    document.querySelectorAll('#segColor button').forEach(b => b.classList.toggle('on', b.dataset.c === c));
+    document.getElementById('legend').classList.toggle('show', c === 'cat');
+    refreshColors();
+  }
+
+  const COARSE_COL = COARSE_HEX.map(h => new THREE.Color(h));
+  const GRAY = new THREE.Color(0x898781);
+  function refreshColors() {
+    for (let i = 0; i < N; i++) {
+      if (mode === 'scan' || colorMode === 'ink') {
+        // scan view is always pure black-on-white; ink mode keeps graphite sides
+        bars.setColorAt(i, mode === 'scan' ? INK_TOP : INK_SIDE);
+        caps.setColorAt(i, INK_TOP);
+      } else {
+        const g = coarseOf[perm[i]];
+        const c = g < 0 ? GRAY : COARSE_COL[g];
+        bars.setColorAt(i, c);
+        caps.setColorAt(i, c);
+      }
+    }
+    bars.instanceColor.needsUpdate = true;
+    caps.instanceColor.needsUpdate = true;
+  }
+  refreshColors();
+
+  // ---------- tooltip ----------
+  const tip = document.getElementById('tip');
+  function showTip(i, x, y) {
+    const h = perm[i]; // the hour this cell currently displays
+    const rowsHtml = D.hours[h].map((v, c) => v === 0 ? '' :
+      `<div class="br"><span class="bl">${CAT_LABELS[c]}</span>` +
+      `<span class="bar" style="width:${Math.max(6, 90 * v / Math.max(1, totals[h]))}px"></span>` +
+      `<span class="bn">${v}</span></div>`).join('');
+    tip.innerHTML =
+      `<div class="when">${fmtWhen(h)}</div>` +
+      `<div class="count">${totals[h]}<small> scan${totals[h] === 1 ? '' : 's'}</small></div>` +
+      (totals[h] ? rowsHtml : '<div class="br"><span class="bl" style="width:auto">asleep, probably</span></div>');
+    tip.classList.add('show');
+    const tw = 240, th = tip.offsetHeight + 20;
+    tip.style.left = Math.min(x + 18, innerWidth - tw) + 'px';
+    tip.style.top = Math.min(y + 18, innerHeight - th) + 'px';
+  }
+  const hideTip = () => tip.classList.remove('show');
+
+  // ---------- input ----------
+  const ray = new THREE.Raycaster();
+  const ptr = new THREE.Vector2();
+  let dragging = false, moved = 0, px = 0, py = 0, pinchD = 0;
+
+  canvas.addEventListener('pointerdown', e => {
+    dragging = true; moved = 0; px = e.clientX; py = e.clientY;
+    autoRotate = false;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (dragging) {
+      const dx = e.clientX - px, dy = e.clientY - py;
+      px = e.clientX; py = e.clientY;
+      moved += Math.abs(dx) + Math.abs(dy);
+      if (mode === 'scan') { if (moved > 12) setMode('sculpture'); return; }
+      if (tween) return;
+      cam.theta -= dx * 0.0052;
+      cam.phi = THREE.MathUtils.clamp(cam.phi - dy * 0.004, 0.28, 1.38);
+      hideTip();
+      return;
+    }
+    ptr.x = (e.clientX / canvas.clientWidth) * 2 - 1;
+    ptr.y = -(e.clientY / canvas.clientHeight) * 2 + 1;
+    ray.setFromCamera(ptr, camera);
+    const hit = ray.intersectObject(bars)[0];
+    const i = hit ? hit.instanceId : -1;
+    if (i !== hoverI) hoverI = i;
+    if (i >= 0) showTip(i, e.clientX, e.clientY); else hideTip();
+  });
+  canvas.addEventListener('pointerup', e => {
+    dragging = false;
+    if (moved < 6 && e.pointerType !== 'mouse') { // tap-to-inspect on touch
+      ptr.x = (e.clientX / canvas.clientWidth) * 2 - 1;
+      ptr.y = -(e.clientY / canvas.clientHeight) * 2 + 1;
+      ray.setFromCamera(ptr, camera);
+      const hit = ray.intersectObject(bars)[0];
+      hoverI = hit ? hit.instanceId : -1;
+      if (hoverI >= 0) showTip(hoverI, e.clientX, e.clientY); else hideTip();
+    }
+  });
+  canvas.addEventListener('pointercancel', () => { dragging = false; });
+  canvas.addEventListener('pointerleave', () => { if (!dragging) { hoverI = -1; hideTip(); } });
+  canvas.addEventListener('wheel', e => {
+    if (mode !== 'sculpture' || tween) return;
+    e.preventDefault();
+    cam.radius = THREE.MathUtils.clamp(cam.radius * (1 + e.deltaY * 0.0011), 62, 260);
+  }, { passive: false });
+
+  document.getElementById('segView').addEventListener('click', e => {
+    if (e.target.dataset.v) setMode(e.target.dataset.v);
+  });
+  document.getElementById('segColor').addEventListener('click', e => {
+    if (e.target.dataset.c) setColorMode(e.target.dataset.c);
+  });
+  document.getElementById('segOrder').addEventListener('click', e => {
+    if (e.target.dataset.o) setOrder(e.target.dataset.o);
+  });
+  document.querySelectorAll('#legend .row').forEach(row => {
+    row.addEventListener('mouseenter', () => { catLift = +row.dataset.cat; });
+    row.addEventListener('mouseleave', () => { catLift = -1; });
+  });
+
+  // ---------- layout ----------
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    const aspect = w / h;
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    SCULPT.shift = w > 900 ? -0.11 : 0;
+    SCULPT.shiftY = w > 900 ? 0 : -0.14;
+    SCULPT.radius = 95 / Math.min(1, Math.max(0.4, aspect) * 1.05);
+    if (mode === 'sculpture' && !tween) {
+      cam.shift = SCULPT.shift;
+      cam.shiftY = SCULPT.shiftY;
+      cam.radius = THREE.MathUtils.clamp(Math.max(cam.radius, SCULPT.radius), 62, 260);
+    }
+    if (mode === 'scan' && !tween) cam.radius = scanRadius();
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // ---------- animation ----------
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(),
+        P = new THREE.Vector3(), S = new THREE.Vector3();
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const T0 = performance.now();
+  const INTRO_SPREAD = 1100, INTRO_DUR = 700;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+
+    if (tween) {
+      const t = Math.min(1, (now - tween.t0) / tween.dur);
+      const k = easeInOut(t);
+      for (const key of ['phi', 'theta', 'radius', 'fov', 'fp', 'shadow', 'shift', 'shiftY', 'ty'])
+        cam[key] = tween.from[key] + (tween.to[key] - tween.from[key]) * k;
+      if (t >= 1) tween = null;
+    } else if (autoRotate && mode === 'sculpture') {
+      cam.theta -= 0.00006 * 16.7;
+    }
+
+    camera.fov = cam.fov;
+    camera.setViewOffset(innerWidth, innerHeight, cam.shift * innerWidth, cam.shiftY * innerHeight, innerWidth, innerHeight);
+    camera.updateProjectionMatrix();
+    camera.position.set(
+      cam.radius * Math.sin(cam.phi) * Math.sin(cam.theta),
+      cam.radius * Math.cos(cam.phi),
+      cam.radius * Math.sin(cam.phi) * Math.cos(cam.theta));
+    camera.lookAt(0, cam.ty, 0);
+    shadowMat.opacity = cam.shadow;
+
+    const intro = now - T0;
+    for (let i = 0; i < N; i++) {
+      const [c, r] = cells[i];
+      const delay = ((r + c) / (2 * SIZE)) * INTRO_SPREAD;
+      const g = easeOut(THREE.MathUtils.clamp((intro - delay) / INTRO_DUR, 0, 1));
+      const targetLift = mode !== 'sculpture' ? 0
+        : i === hoverI ? 0.5
+        : catLift >= 0 && colorMode === 'cat' && coarseOf[perm[i]] === catLift ? 3.6
+        : 0;
+      lift[i] += (targetLift - lift[i]) * 0.14;
+      dispH[i] += (heights[perm[i]] - dispH[i]) * 0.09;
+      const h = dispH[i] * g;
+      P.set(c - HALF, lift[i], r - HALF);
+      S.set(cam.fp, Math.max(h, 0.001), cam.fp);
+      M.compose(P, Q, S);
+      bars.setMatrixAt(i, M);
+      P.y = lift[i] + h + 0.004;
+      S.set(cam.fp, 1, cam.fp);
+      M.compose(P, Q, S);
+      caps.setMatrixAt(i, M);
+    }
+    bars.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+
+  // dev handle
+  window.dd = { scene, camera, bars, caps, cam, cells, heights, setMode, setColorMode, setOrder, ray, ptr };
+
+  // ---------- scannability self-test (debug: run ddVerify() in console) ----------
+  window.ddVerify = async function () {
+    if (!window.jsQR) {
+      await new Promise((ok, bad) => {
+        const s = document.createElement('script');
+        s.src = 'vendor/jsqr.js'; s.onload = ok; s.onerror = bad;
+        document.head.appendChild(s);
+      });
+    }
+    const keep = { fp: cam.fp, shadow: cam.shadow };
+    const keepMode = mode;
+    mode = 'scan'; refreshColors(); // ink override, as in the real scan view
+    Object.assign(cam, { fp: 1.03, shadow: 0 });
+    // rebuild instance matrices at full footprint
+    for (let i = 0; i < N; i++) {
+      const [c, r] = cells[i];
+      P.set(c - HALF, 0, r - HALF); S.set(1.03, Math.max(heights[i], 0.001), 1.03);
+      M.compose(P, Q, S); bars.setMatrixAt(i, M);
+      P.y = heights[i] + 0.004; S.set(1.03, 1, 1.03);
+      M.compose(P, Q, S); caps.setMatrixAt(i, M);
+    }
+    bars.instanceMatrix.needsUpdate = caps.instanceMatrix.needsUpdate = true;
+
+    // replicate the real scan view: perspective dolly-zoom incl. its parallax
+    const E = HALF + 1 + 4.5;
+    const testCam = new THREE.PerspectiveCamera(SCAN.fov, 1, 0.1, 2500);
+    const r = E / Math.tan(THREE.MathUtils.degToRad(SCAN.fov / 2));
+    testCam.position.set(0, r * Math.cos(SCAN.phi), r * Math.sin(SCAN.phi));
+    testCam.lookAt(0, 0, 0);
+    const RES = 1024;
+    const rt = new THREE.WebGLRenderTarget(RES, RES);
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, testCam);
+    const buf = new Uint8Array(RES * RES * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, RES, RES, buf);
+    renderer.setRenderTarget(null);
+    rt.dispose();
+    // flip vertically (GL reads bottom-up)
+    const flipped = new Uint8ClampedArray(RES * RES * 4);
+    for (let y = 0; y < RES; y++)
+      flipped.set(buf.subarray((RES - 1 - y) * RES * 4, (RES - y) * RES * 4), y * RES * 4);
+
+    Object.assign(cam, keep);
+    mode = keepMode; refreshColors();
+    const res = window.jsQR(flipped, RES, RES);
+    console.log('[ddVerify]', res ? `DECODED: "${res.data}"` : 'FAILED to decode');
+    return res ? res.data : null;
+  };
+})();
+</script>
+</body>
+</html>

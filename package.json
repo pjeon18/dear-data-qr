@@ -1,0 +1,17 @@
+{
+  "name": "dear-data-qr",
+  "version": "1.0.0",
+  "description": "Dear Data postcard: a working QR code built from hourly QR-scan data",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "serve": "python3 -m http.server 5250"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
+  }
+}
